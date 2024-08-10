@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Editor } from '@monaco-editor/react';
 import io from 'socket.io-client';
+import Navbar from '../Components/Navbar';
 import { javaSuggestions } from '../Components/javaSuggestions'; // Import your custom suggestions
 
 function EditorPage() {
@@ -162,6 +163,7 @@ function EditorPage() {
               placeholder="Enter file name"
               style={{ width: '200px', marginRight: '10px' }}
             />
+          
             <button onClick={handleSaveCode}>
               Save Code
             </button>

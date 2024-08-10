@@ -20,3 +20,70 @@
 .boxx{
   /* border:2px solid #282c34; */
 }
+
+
+
+/* CSS */
+.button-74 {
+  background-color: #fbeee0;
+  border: 2px solid #422800;
+  border-radius: 30px;
+  box-shadow: #422800 4px 4px 0 0;
+  color: #422800;
+  cursor: pointer;
+  display: inline-block;
+  font-weight: 600;
+  font-size: 18px;
+  padding: 0 18px;
+  line-height: 50px;
+  text-align: center;
+  text-decoration: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.button-74:hover {
+  background-color: #fff;
+}
+
+.button-74:active {
+  box-shadow: #422800 2px 2px 0 0;
+  transform: translate(2px, 2px);
+}
+
+@media (min-width: 768px) {
+  .button-74 {
+    min-width: 120px;
+    padding: 0 25px;
+  }
+}
+
+
+.button-75{
+
+
+display: inline-block;
+outline: none;
+cursor: pointer;
+font-weight: 600;
+border-radius: 3px;
+padding: 12px 24px;
+border: 0;
+color: #000021;
+background: #1de9b6;
+line-height: 1.15;
+font-size: 16px;
+}
+
+button-75:hover {
+    transition: all .1s ease;
+    box-shadow: 0 0 0 0 #fff, 0 0 0 3px #1de9b6;
+}
+.home-page{
+  width: 100%;
+ 
+
+
+
+}

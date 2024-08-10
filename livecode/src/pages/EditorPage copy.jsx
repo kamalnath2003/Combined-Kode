@@ -72,6 +72,7 @@ const handleCompileAndRun = async () => {
         <div className="output-label">Output:</div>
         <pre>{output}</pre>
       </div>
+      
     </div>
   );
 }

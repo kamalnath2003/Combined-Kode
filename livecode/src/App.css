@@ -2,7 +2,7 @@
 .output-container {
   /* margin-top: 20px; */
   padding: 10px;
-  margin-right: 10px;
+
   
   background-color: #282c34;
   color: #61dafb;
@@ -52,12 +52,12 @@
   transform: translate(2px, 2px);
 }
 
-@media (min-width: 768px) {
+/* @media (min-width: 768px) {
   .button-74 {
     min-width: 120px;
     padding: 0 25px;
   }
-}
+} */
 
 
 .button-75{
@@ -86,4 +86,7 @@ button-75:hover {
 
 
 
+}
+.col{
+  padding: 0px;
 }

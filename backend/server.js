@@ -23,6 +23,7 @@ app.use(express.json());
 // Keep track of active clients for each session
 const sessionClients = {};
 
+
 io.on('connection', (socket) => {
   const { id } = socket.handshake.query;
   const sessionDir = path.join(__dirname, 'sessions', id);

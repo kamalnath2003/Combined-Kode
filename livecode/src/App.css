@@ -264,3 +264,52 @@ button-75:hover {
   /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
   background: linear-gradient(to bottom, rgba(48,207,208,0.05), rgba(51,8,103,0.05))
 }
+
+.user-cursor-color {
+  background-color: transparent; /* Each user's color */
+}
+
+.user-cursor-inline {
+  position: absolute;
+  background-color: rgba(0, 255, 0, 0.3); /* Example cursor color */
+  width: 2px;
+  height: 100%;
+}
+
+.user-cursor-before::before {
+  content: '•';
+  color: green; /* Example dot color */
+  margin-left: -8px;
+}
+/* Define the cursor colors and styles */
+.user-cursor-inline-USER_ID {
+  background-color: USER_COLOR;
+  border-left: 2px solid USER_COLOR;
+}
+
+.user-cursor-before-USER_ID::before {
+  content: ' ';
+  display: inline-block;
+  width: 2px;
+  height: 100%;
+  background-color: USER_COLOR;
+}
+.user-cursor-color {
+  border-bottom: 2px solid;
+}
+
+.user-cursor-inline-1 {
+  color: red;
+}
+
+.user-cursor-inline-2 {
+  color: blue;
+}
+
+.user-cursor-before-1 {
+  background-color: red;
+}
+
+.user-cursor-before-2 {
+  background-color: blue;
+}

@@ -9,6 +9,10 @@ export function useSocket() {
 }
 
 export function SocketProvider({ children, sessionId }) {
+
+
+  const init = 'class Main{\n\tpublic static void main(String []args){\n\n\t\tSystem.out.println("My First Java Program.");\n\n\t}\n}'
+
   const [code, setCode] = useState('// Shared Java code goes here\n');
   const [output, setOutput] = useState('');
   const [input, setInput] = useState('');

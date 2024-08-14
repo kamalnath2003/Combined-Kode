@@ -1,119 +1,154 @@
-// const express = require('express');
-// const bodyParser = require('body-parser');
-// const { exec } = require('child_process');
-// const cors = require('cors');
-// const app = express();
-
-// app.use(bodyParser.json());
-// app.use(cors());
-
-// app.post('/compile', (req, res) => {
-//   const code = req.body.code;
-
-//   // Write the code to a temporary Java file
-//   require('fs').writeFileSync('Main.java', code);
-
-//   // Compile and run the Java code
-//   exec('javac Main.java && java Main', (error, stdout, stderr) => {
-//     if (error) {
-//       res.send({ output: stderr });
-//     } else {
-//       res.send({ output: stdout });
-//     }
-//   });
-// });
-
-// const PORT = process.env.PORT || 5000;
-// app.listen(PORT, () => console.log(`Server running on port ${PORT}`));const express = require('express');
 const express = require('express');
-const bodyParser = require('body-parser');
-const { exec } = require('child_process');
-const cors = require('cors');
-const WebSocket = require('ws');
+const http = require('http');
+const { Server } = require('socket.io');
 const fs = require('fs');
 const path = require('path');
+const cors = require('cors');
+const { spawn } = require('child_process');
 
-// Ensure the temp directory exists
-const tempDir = path.join(__dirname, 'temp');
-if (!fs.existsSync(tempDir)) {
-  fs.mkdirSync(tempDir);
-}
-
-const tempFilePath = path.join(tempDir, 'Main.java');
-const classFilePath = path.join(tempDir, 'Main.class');
-
-// Initialize Express app
 const app = express();
-app.use(bodyParser.json());
-app.use(cors());
-
-// WebSocket server setup
-const server = app.listen(process.env.PORT || 5000, () => {
-  console.log(`Server running on port ${server.address().port}`);
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"]
+  },
+  transports: ['websocket'],
+  perMessageDeflate: false
 });
-const wss = new WebSocket.Server({ server });
 
-// WebSocket connections management
-const sessions = {}; // Store sessions and their connections
+app.use(cors());
+app.use(express.json());
 
-wss.on('connection', (ws, req) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  const sessionId = url.pathname.split('/')[2];
+// Track active clients and session outputs
+const sessionClients = {};
+const sessionOutputs = {};
 
-  if (!sessions[sessionId]) {
-    sessions[sessionId] = [];
+io.on('connection', (socket) => {
+  const { id } = socket.handshake.query;
+  const sessionDir = path.join(__dirname, 'sessions', id);
+  const tempFilePath = path.join(sessionDir, 'Main.java');
+  const outputLogPath = path.join(sessionDir, 'output.log');
+
+  if (!fs.existsSync(sessionDir)) {
+    fs.mkdirSync(sessionDir, { recursive: true });
+    
+    // Create boilerplate code for new sessions
+    const boilerplateCode = `public class Main {
+      public static void main(String[] args) {
+        System.out.println("Hello, World!");
+      }
+    }`;
+    fs.writeFileSync(tempFilePath, boilerplateCode);
+
+    // Initialize empty output log for the new session
+    fs.writeFileSync(outputLogPath, '');
+    sessionOutputs[id] = ''; // Initialize sessionOutputs
   }
 
-  sessions[sessionId].push(ws);
+  sessionClients[id] = (sessionClients[id] || 0) + 1; // Increment active client count
+  socket.join(id);
 
-  ws.on('message', (message) => {
-    // Broadcast message to all clients in the same session
-    sessions[sessionId].forEach(client => {
-      if (client !== ws && client.readyState === WebSocket.OPEN) {
-        client.send(message);
+  let javaProcess = null;
+
+  // Send existing code and output to new client
+  if (fs.existsSync(tempFilePath)) {
+    const existingCode = fs.readFileSync(tempFilePath, 'utf8');
+    socket.emit('codeUpdate', existingCode);
+  }
+
+  if (fs.existsSync(outputLogPath)) {
+    const existingOutput = fs.readFileSync(outputLogPath, 'utf8');
+    socket.emit('outputUpdate', existingOutput);
+  }
+
+  socket.on('startCode', ({ code }) => {
+    if (javaProcess) {
+      javaProcess.kill(); // Ensure no previous process is running
+      javaProcess = null; // Reset the process reference
+    }
+
+    fs.writeFileSync(tempFilePath, code);
+    fs.writeFileSync(outputLogPath, ''); // Clear output log for new run
+    sessionOutputs[id] = ''; // Clear sessionOutputs
+
+    const javac = spawn('javac', [tempFilePath]);
+
+    javac.stderr.on('data', (data) => {
+      const errorOutput = `Compilation error: ${data.toString()}`;
+      fs.appendFileSync(outputLogPath, errorOutput); // Append to output log
+      sessionOutputs[id] += errorOutput; // Update sessionOutputs
+      io.in(id).emit('outputUpdate', errorOutput);
+      io.in(id).emit('isCompiled', false); // Indicate compilation failed
+    });
+
+    javac.on('close', (code) => {
+      if (code === 0) {
+        io.in(id).emit('compilationSuccess');
+        javaProcess = spawn('java', ['-cp', sessionDir, 'Main']);
+
+        javaProcess.stdout.on('data', (data) => {
+          const output = data.toString();
+          fs.appendFileSync(outputLogPath, output); // Append to output log
+          sessionOutputs[id] += output; // Update sessionOutputs
+          io.in(id).emit('outputUpdate', output);
+        });
+
+        javaProcess.stderr.on('data', (data) => {
+          const errorOutput = `Runtime error: ${data.toString()}`;
+          fs.appendFileSync(outputLogPath, errorOutput); // Append to output log
+          sessionOutputs[id] += errorOutput; // Update sessionOutputs
+          io.in(id).emit('outputUpdate', errorOutput);
+        });
+
+        javaProcess.on('close', (code) => {
+          io.in(id).emit('endProcess'); // Notify clients that the process has ended
+          javaProcess = null; // Reset the process reference after it ends
+        });
+      } else {
+        io.in(id).emit('outputUpdate', 'Compilation failed');
+        io.in(id).emit('isCompiled', false); // Indicate compilation failed
       }
     });
   });
 
-  ws.on('close', () => {
-    sessions[sessionId] = sessions[sessionId].filter(client => client !== ws);
-    if (sessions[sessionId].length === 0) {
-      delete sessions[sessionId];
+  socket.on('sendInput', (input) => {
+    if (javaProcess) {
+      javaProcess.stdin.write(input + '\n');
+      io.in(id).emit('inputUpdate', input); // Broadcast input to all clients in the session
+    }
+  });
+
+  socket.on('codeChange', (newCode) => {
+    io.in(id).emit('codeUpdate', newCode); // Broadcast code change
+  });
+
+  socket.on('abort', () => {
+    if (javaProcess) {
+      javaProcess.kill(); // Terminate the running Java process
+      io.in(id).emit('outputUpdate', 'Process aborted by user.');
+      io.in(id).emit('endProcess'); // Notify clients that the process has ended
+      javaProcess = null; // Reset the process reference after aborting
+    }
+  });
+
+  socket.on('disconnect', () => {
+    sessionClients[id] = (sessionClients[id] || 1) - 1; // Decrement active client count
+
+    // Clean up session folder after disconnect if no clients are left
+    if (sessionClients[id] <= 0) {
+      fs.rmdirSync(sessionDir, { recursive: true });
+      delete sessionClients[id]; // Remove session from tracking
+      delete sessionOutputs[id]; // Remove session output log from tracking
+    }
+
+    if (javaProcess) {
+      javaProcess.kill();
+      javaProcess = null; // Reset the process reference on disconnect
     }
   });
 });
 
-// Route for compiling and running Java code
-app.post('/compile', (req, res) => {
-  const code = req.body.code;
-
-  if (!code) {
-    return res.status(400).send({ output: 'No code provided' });
-  }
-
-  // Write the code to a temporary Java file
-  fs.writeFileSync(tempFilePath, code);
-
-  // Compile and run the Java code
-  exec(`javac ${tempFilePath} && java -cp ${tempDir} Main`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`Execution error: ${stderr}`);
-      return res.send({ output: stderr });
-    }
-
-    console.log(`Execution output: ${stdout}`);
-    res.send({ output: stdout });
-
-    // Cleanup files after execution
-    try {
-      if (fs.existsSync(tempFilePath)) {
-        fs.unlinkSync(tempFilePath);
-      }
-      if (fs.existsSync(classFilePath)) {
-        fs.unlinkSync(classFilePath);
-      }
-    } catch (cleanupError) {
-      console.error(`Cleanup error: ${cleanupError.message}`);
-    }
-  });
+server.listen(5000, () => {
+  console.log('Server is listening on port 5000');
 });

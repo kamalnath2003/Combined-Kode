@@ -10,7 +10,9 @@ const Navbar =(props)=> {
 
 
   return (<>
+
   <nav className=" navbar navbar-expand-lg shadow"style={{ backgroundColor: '#41b9a5', height:"60px" }}>
+    
   <a className="navbar-brand" href="#"><a className="navbar-brand ms-5 shadow" href="/"><img src="/kode.svg" style={{width:"40%"}} alt="" /></a></a>
   { props.page=='editor' &&<p class=" rajdhani-bold " >Your session id : {props.id}</p>}
   <button className="navbar-toggler collapsed" type="button" data-toggle="collapse" data-target="#navbarColor03" aria-controls="navbarColor03" aria-expanded="false" aria-label="Toggle navigation">

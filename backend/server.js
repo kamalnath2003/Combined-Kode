@@ -23,11 +23,11 @@ app.use(express.json());
 // Keep track of active clients for each session
 const sessionClients = {};
 
-
 io.on('connection', (socket) => {
   const { id } = socket.handshake.query;
   const sessionDir = path.join(__dirname, 'sessions', id);
   const tempFilePath = path.join(sessionDir, 'Main.java');
+  const logFilePath = path.join(sessionDir, 'output.log');
 
   if (!fs.existsSync(sessionDir)) {
     fs.mkdirSync(sessionDir, { recursive: true });
@@ -44,6 +44,12 @@ io.on('connection', (socket) => {
     socket.emit('codeUpdate', existingCode);
   }
 
+  // Send existing log content to the new client
+  if (fs.existsSync(logFilePath)) {
+    const existingLog = fs.readFileSync(logFilePath, 'utf8');
+    socket.emit('outputUpdate', existingLog);
+  }
+
   socket.on('startCode', ({ code }) => {
     if (javaProcess) {
       javaProcess.kill(); // Ensure no previous process is running
@@ -51,11 +57,14 @@ io.on('connection', (socket) => {
     }
 
     fs.writeFileSync(tempFilePath, code);
+    fs.writeFileSync(logFilePath, ''); // Clear previous log content
 
     const javac = spawn('javac', [tempFilePath]);
 
     javac.stderr.on('data', (data) => {
-      io.in(id).emit('outputUpdate', `Compilation error: ${data.toString()}`);
+      const errorOutput = `Compilation error: ${data.toString()}`;
+      fs.appendFileSync(logFilePath, errorOutput + '\n');
+      io.in(id).emit('outputUpdate', errorOutput);
       io.in(id).emit('isCompiled', false); // Indicate compilation failed
     });
 
@@ -65,11 +74,15 @@ io.on('connection', (socket) => {
         javaProcess = spawn('java', ['-cp', sessionDir, 'Main']);
 
         javaProcess.stdout.on('data', (data) => {
-          io.in(id).emit('outputUpdate', data.toString());
+          const output = data.toString();
+          fs.appendFileSync(logFilePath, output);
+          io.in(id).emit('outputUpdate', output);
         });
 
         javaProcess.stderr.on('data', (data) => {
-          io.in(id).emit('outputUpdate', `Runtime error: ${data.toString()}`);
+          const errorOutput = `Runtime error: ${data.toString()}`;
+          fs.appendFileSync(logFilePath, errorOutput + '\n');
+          io.in(id).emit('outputUpdate', errorOutput);
         });
 
         javaProcess.on('close', (code) => {
@@ -77,7 +90,9 @@ io.on('connection', (socket) => {
           javaProcess = null; // Reset the process reference after it ends
         });
       } else {
-        io.in(id).emit('outputUpdate', 'Compilation failed');
+        const compileErrorOutput = 'Compilation failed';
+        fs.appendFileSync(logFilePath, compileErrorOutput + '\n');
+        io.in(id).emit('outputUpdate', compileErrorOutput);
         io.in(id).emit('isCompiled', false); // Indicate compilation failed
       }
     });
@@ -102,6 +117,13 @@ io.on('connection', (socket) => {
       io.in(id).emit('endProcess'); // Notify clients that the process has ended
       javaProcess = null; // Reset the process reference after aborting
     }
+  });
+
+  socket.on('clearOutput', () => {
+    if (fs.existsSync(logFilePath)) {
+      fs.unlinkSync(logFilePath); // Delete the log file
+    }
+    io.in(id).emit('outputUpdate', ''); // Clear output in all clients
   });
 
   socket.on('disconnect', () => {

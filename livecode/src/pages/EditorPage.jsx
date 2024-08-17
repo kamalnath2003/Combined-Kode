@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { SocketProvider, useSocket } from '../Context/SocketContext';
 import { Editor } from '@monaco-editor/react';
 import Navbar from '../Components/Navbar';
 import { useParams } from 'react-router-dom';
 import '../pages/Editorpage.css';
 import OutputBox from '../Components/OutputBox';
+import { javaCompletionProvider } from '../Components/javaCompletionProvider'; // Adjust path as necessary
 
 function EditorPageContent() {
   const { id } = useParams();
@@ -14,6 +15,8 @@ function EditorPageContent() {
     handleCompileAndRun,
     isRunning,
     setInput,
+    socket,
+    setOutput,
     fileName,
     handleFileNameChange,
     input,
@@ -22,9 +25,13 @@ function EditorPageContent() {
     output,
     isCompiled,
     handleAbort,
-    handleClearOutput
-
+    handleClearOutput,
+    isinputwant
   } = useSocket();
+
+  const handleEditorDidMount = (editor, monaco) => {
+    javaCompletionProvider(monaco); // Register the completion provider
+  };
 
   return (
     <section className='gradient-custom1 ' style={{paddingBottom:'25%'}}>
@@ -45,6 +52,7 @@ function EditorPageContent() {
                 theme="vs-dark"
                 value={code}
                 onChange={handleCodeChange}
+                onMount={handleEditorDidMount} // Register completion provider
               />
             </div>
           </div>
@@ -56,8 +64,9 @@ function EditorPageContent() {
                 isRunning={isRunning}
                 setInput={setInput} 
                 input={input}
-                                  
-
+                isinputwant={isinputwant}
+                socket= {socket}
+                setOutput= {setOutput}
                 handleSendInput={handleSendInput}
               />
             </div>

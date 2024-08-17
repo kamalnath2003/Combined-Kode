@@ -20,30 +20,18 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
-// Track active clients and session outputs
+// Define timeout for input detection
+
+// Keep track of active clients for each session
 const sessionClients = {};
-const sessionOutputs = {};
 
 io.on('connection', (socket) => {
   const { id } = socket.handshake.query;
   const sessionDir = path.join(__dirname, 'sessions', id);
   const tempFilePath = path.join(sessionDir, 'Main.java');
-  const outputLogPath = path.join(sessionDir, 'output.log');
 
   if (!fs.existsSync(sessionDir)) {
     fs.mkdirSync(sessionDir, { recursive: true });
-    
-    // Create boilerplate code for new sessions
-    const boilerplateCode = `public class Main {
-      public static void main(String[] args) {
-        System.out.println("Hello, World!");
-      }
-    }`;
-    fs.writeFileSync(tempFilePath, boilerplateCode);
-
-    // Initialize empty output log for the new session
-    fs.writeFileSync(outputLogPath, '');
-    sessionOutputs[id] = ''; // Initialize sessionOutputs
   }
 
   sessionClients[id] = (sessionClients[id] || 0) + 1; // Increment active client count
@@ -51,15 +39,10 @@ io.on('connection', (socket) => {
 
   let javaProcess = null;
 
-  // Send existing code and output to new client
+  // Send existing code to the new client
   if (fs.existsSync(tempFilePath)) {
     const existingCode = fs.readFileSync(tempFilePath, 'utf8');
     socket.emit('codeUpdate', existingCode);
-  }
-
-  if (fs.existsSync(outputLogPath)) {
-    const existingOutput = fs.readFileSync(outputLogPath, 'utf8');
-    socket.emit('outputUpdate', existingOutput);
   }
 
   socket.on('startCode', ({ code }) => {
@@ -69,16 +52,11 @@ io.on('connection', (socket) => {
     }
 
     fs.writeFileSync(tempFilePath, code);
-    fs.writeFileSync(outputLogPath, ''); // Clear output log for new run
-    sessionOutputs[id] = ''; // Clear sessionOutputs
 
     const javac = spawn('javac', [tempFilePath]);
 
     javac.stderr.on('data', (data) => {
-      const errorOutput = `Compilation error: ${data.toString()}`;
-      fs.appendFileSync(outputLogPath, errorOutput); // Append to output log
-      sessionOutputs[id] += errorOutput; // Update sessionOutputs
-      io.in(id).emit('outputUpdate', errorOutput);
+      io.in(id).emit('outputUpdate', `Compilation error: ${data.toString()}`);
       io.in(id).emit('isCompiled', false); // Indicate compilation failed
     });
 
@@ -88,17 +66,13 @@ io.on('connection', (socket) => {
         javaProcess = spawn('java', ['-cp', sessionDir, 'Main']);
 
         javaProcess.stdout.on('data', (data) => {
-          const output = data.toString();
-          fs.appendFileSync(outputLogPath, output); // Append to output log
-          sessionOutputs[id] += output; // Update sessionOutputs
-          io.in(id).emit('outputUpdate', output);
+          io.in(id).emit('outputUpdate', data.toString());
+
+         
         });
 
         javaProcess.stderr.on('data', (data) => {
-          const errorOutput = `Runtime error: ${data.toString()}`;
-          fs.appendFileSync(outputLogPath, errorOutput); // Append to output log
-          sessionOutputs[id] += errorOutput; // Update sessionOutputs
-          io.in(id).emit('outputUpdate', errorOutput);
+          io.in(id).emit('outputUpdate', `Runtime error: ${data.toString()}`);
         });
 
         javaProcess.on('close', (code) => {
@@ -120,6 +94,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('codeChange', (newCode) => {
+    fs.writeFileSync(tempFilePath, newCode); // Save the new code
     io.in(id).emit('codeUpdate', newCode); // Broadcast code change
   });
 
@@ -137,9 +112,8 @@ io.on('connection', (socket) => {
 
     // Clean up session folder after disconnect if no clients are left
     if (sessionClients[id] <= 0) {
-      fs.rmdirSync(sessionDir, { recursive: true });
+      fs.rmdirSync(path.join(__dirname, 'sessions', id), { recursive: true });
       delete sessionClients[id]; // Remove session from tracking
-      delete sessionOutputs[id]; // Remove session output log from tracking
     }
 
     if (javaProcess) {

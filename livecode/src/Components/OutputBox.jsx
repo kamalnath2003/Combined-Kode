@@ -23,9 +23,12 @@ function OutputBox(props) {
               position: 'absolute',
               bottom: '20px',
               backgroundColor: '#333',
+              marginleft:'10px',
               color: '#fff',
               padding: '8px',
               borderRadius: '4px',
+              left:'4%',
+
               zIndex: 10,
               width: '90%',
               overflow: 'hidden',
@@ -38,6 +41,8 @@ function OutputBox(props) {
               style={{
                 backgroundColor: '#444',
                 color: '#fff',
+              left:'100px',
+
                 border: 'none',
                 resize: 'none',
                 width: '100%',

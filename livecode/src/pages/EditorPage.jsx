@@ -6,6 +6,7 @@ import { useParams } from 'react-router-dom';
 import '../pages/Editorpage.css';
 import OutputBox from '../Components/OutputBox';
 import { javaCompletionProvider } from '../Components/javaCompletionProvider'; // Adjust path as necessary
+import Editorbox from '../Components/Editorbox';
 
 function EditorPageContent() {
   const { id } = useParams();
@@ -46,14 +47,11 @@ function EditorPageContent() {
         <div className="row d-flex" style={{ marginRight: "0px" }}>
           <div className="col-6">
             <div className="editor-page">
-              <Editor
-                height="60vh"
-                language="java"
-                theme="vs-dark"
-                value={code}
-                onChange={handleCodeChange}
-                onMount={handleEditorDidMount} // Register completion provider
-              />
+              <Editorbox
+              code = {code}
+              handleCodeChange= {handleCodeChange}
+              handleEditorDidMount = {handleEditorDidMount}
+              />              
             </div>
           </div>
           <div className="col-6">
